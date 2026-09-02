@@ -19,7 +19,7 @@ namespace Fit.Core
     {
         [Header("子系统")]
         [SerializeField] private NetworkManager _networkManager;
-        [SerializeField] private IslandStreamer _islandStreamer;
+        [SerializeField] private RoomStreamer _roomStreamer;
         [SerializeField] private VoiceSystem _voiceSystem;
         [SerializeField] private AutoSaver _autoSaver;
 
@@ -28,23 +28,26 @@ namespace Fit.Core
             Application.runInBackground = true; // 房主切窗口时世界必须继续跑
             Application.targetFrameRate = 0;    // 交给玩家在设置里限帧
 
-            ServiceLocator.Register(_networkManager);
-            ServiceLocator.Register(_islandStreamer);
-            ServiceLocator.Register(_voiceSystem);
-            ServiceLocator.Register(_autoSaver);
+            // 全部走可空注册：灰盒阶段场景里往往只挂了战斗相关的组件，
+            // 缺哪个子系统都不应该让整个启动流程炸掉。
+            if (_networkManager != null) ServiceLocator.Register(_networkManager);
+            if (_roomStreamer != null) ServiceLocator.Register(_roomStreamer);
+            if (_voiceSystem != null) ServiceLocator.Register(_voiceSystem);
+            if (_autoSaver != null) ServiceLocator.Register(_autoSaver);
         }
 
         private void Start()
         {
-            _islandStreamer.Initialize();
-            _voiceSystem.Initialize();
-            _autoSaver.Initialize();
+            // _roomStreamer 在原型阶段可以不配，缺了就跳过，不影响战斗验证。
+            _roomStreamer?.Initialize();
+            _voiceSystem?.Initialize();
+            _autoSaver?.Initialize();
         }
 
         private void OnApplicationQuit()
         {
-            _autoSaver.Flush();
-            _voiceSystem.Shutdown();
+            _autoSaver?.Flush();
+            _voiceSystem?.Shutdown();
             ServiceLocator.Clear();
         }
     }

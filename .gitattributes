@@ -47,3 +47,8 @@
 *.md text
 *.yml text
 *.yaml text
+
+# 本地 vendored 依赖（LocalPackages/ 下的 FishNet / Steamworks.NET）体积小，
+# 强制不走 LFS —— 否则克隆仓库必须配置 LFS 才能拿到这些 dll，徒增协作门槛。
+LocalPackages/ -filter
+LocalPackages/** -filter

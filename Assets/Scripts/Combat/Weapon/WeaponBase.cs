@@ -33,6 +33,11 @@ namespace Fit.Combat.Weapon
         [SerializeField, Range(0f, 10f)] private float _assistAngleDegrees = 3f;
         [SerializeField] private float _assistRange = 60f;
 
+        [Header("初始配置")]
+        [SerializeField, Tooltip("场景启动时自动装备。留空则需要运行时调用 Equip()。\n" +
+                                 "Data 是 { get; private set; }，无法在 Inspector 直接赋值，所以初始武器走这里。")]
+        private WeaponData _startWeapon;
+
         public WeaponData Data { get; private set; }
         public bool HasWeapon => Data != null;
 
@@ -75,6 +80,14 @@ namespace Fit.Combat.Weapon
             Data = null;
             AmmoInMagazine = 0;
             OnWeaponChanged?.Invoke(null);
+        }
+
+        private void Start()
+        {
+            // 放在 Start 而不是 Awake：给外部系统在 Awake 里先 Equip 一把的机会，
+            // 那时 HasWeapon 为 true，这里就不会覆盖掉。
+            if (_startWeapon != null && !HasWeapon)
+                Equip(_startWeapon);
         }
 
         private void Update()

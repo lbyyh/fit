@@ -12,8 +12,12 @@ namespace Fit.Networking
     /// 为什么要两条链路：
     ///   1. FishySteamworks 走 Steam Networking Sockets，天然穿透 NAT，房主无需端口转发，
     ///      是 Steam 版本的主路径。
-    ///   2. FishyUnityTransport 走 UTP/UDP 直连，用于非 Steam 环境（其他商店、局域网、
+    ///   2. Tugboat（FishNet 4.x 内置的 UDP 传输）走直连，用于非 Steam 环境（其他商店、局域网、
     ///      开发期多开），以及 Steam 中继不可用时的降级。
+    ///
+    /// 注：原设计用的 FishyUnityTransport 独立仓库（FirstGearGames/FishyUnityTransport）
+    /// 已从 GitHub 删除（404），故直连改为 FishNet 内置的 Tugboat，零外部依赖。
+    /// Steam 主路径需要的 FishySteamworks 包尚未 vendoring，留到阶段 3 联机时补。
     ///
     /// 运行时可根据 Steam 初始化结果自动选择，也可由玩家在设置里手动指定。
     /// </summary>
@@ -55,10 +59,10 @@ namespace Fit.Networking
             Transport chosen = _kind switch
             {
                 TransportKind.Steam => FindTransportByTypeName("FishySteamworks"),
-                TransportKind.UnityTransport => FindTransportByTypeName("FishyUnityTransport"),
+                TransportKind.UnityTransport => FindTransportByTypeName("Tugboat"),
                 _ => SteamSession.IsSteamAvailable
                     ? FindTransportByTypeName("FishySteamworks")
-                    : FindTransportByTypeName("FishyUnityTransport")
+                    : FindTransportByTypeName("Tugboat")
             };
 
             if (chosen == null)

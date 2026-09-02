@@ -64,7 +64,7 @@ Unity 6 多人合作游戏项目的工程骨架。
 ### 3. 配置 Addressables
 
 `Window > Asset Management > Addressables > Groups`，
-为每个岛屿场景设置 Addressable Key（与 `IslandStreamer.Islands` 里的
+为每个房间/岛屿场景设置 Addressable Key（与 `RoomStreamer.Rooms` 里的
 `AddressableKey` 字段保持一致）。
 
 ### 4. 配置本地化
@@ -87,32 +87,42 @@ Assets/Scripts/
 ├── Core/           GameBootstrap（显式初始化编排）、ServiceLocator
 ├── Networking/
 │   ├── FitNetworkManager        会话生命周期 + 指数退避重连
-│   ├── TransportSwitcher        Multipass 双传输（Steam P2P / UTP 直连）
+│   ├── TransportSwitcher        Multipass 双传输（Steam P2P / Tugboat 直连）
 │   ├── NetworkEntity            所有联网实体的基类
 │   ├── Session/                 SteamLobbyService、ServerListStore
 │   ├── Sync/                    NetworkRigidbodySync（插值 + 瞬移阈值）
 │   └── Player/                  NetworkPlayer、PlayerVitals、PlayerInventory
 ├── Voice/          VoiceSettings、MicrophoneInput、OpusCodec、
 │                   FishNetVoiceProvider、VoicePlayback（抖动缓冲）
-├── World/          IslandStreamer、UnderwaterController、Water/GerstnerWaves
+├── World/          RoomStreamer（由 IslandStreamer 改造，房间流式加载）
+├── Legacy/         原海洋世界模块（IslandStreamer、GerstnerWaves、UnderwaterController），主工程不编译
 ├── Save/           SaveData（原子写 + 备份）、AutoSaver（节流 + 强制落盘）
 ├── Gameplay/       Creatures、Economy、Achievements
 └── UI/             LobbyMenu、ServerListEntryView
 ```
 
-## 依赖说明
+## 依赖说明（已本地化，离线可用）
 
-`Packages/manifest.json` 中三个包通过 Git URL 引入，首次打开会较慢：
+FishNet 与 Steamworks.NET 不再走 Git URL，而是 **vendoring 进本仓库的
+`LocalPackages/`**，通过 `file:` 引用。这样你**首次打开工程不需要任何网络**
+（不用从 github.com 拉包），国内网络环境也能稳定打开。
 
-| 包 | 来源 |
-|---|---|
-| Steamworks.NET | `github.com/rlabrecque/Steamworks.NET` |
-| FishNet | `github.com/FirstGearGames/FishNet` |
-| FishyUnityTransport | `github.com/FirstGearGames/FishyUnityTransport` |
+| 包 | 本地路径 | 版本 |
+|---|---|---|
+| FishNet | `LocalPackages/FishNet` | 4.7.3（包内 `package.json` 写 4.7.2） |
+| Steamworks.NET | `LocalPackages/Steamworks.NET` | 20.2.0 |
 
-> **注意**：FishNet 主仓库的部分功能需要授权。请确认你的使用方式符合其许可协议。
+> **原 `FishyUnityTransport` 依赖已删除**：其独立仓库
+> `FirstGearGames/FishyUnityTransport` 已从 GitHub 移除（404）。
+> 直连传输改为 FishNet 4.x **内置的 Tugboat**（零外部依赖）。
+> 原设计的 Steam P2P 传输 `FishySteamworks` 包尚未引入，留到阶段 3 联机时补。
+
+> **许可提醒**：FishNet 为 **GPL-3.0**。源码已随本仓库提交，私有开发不受影响；
+> 但若将来公开发布游戏，需遵守 GPL（开源游戏代码）或向 FirstGearGames 购买商业许可。
+> Steamworks.NET 为 **MIT**，无此限制。
+
 > 若不使用 Steam，在 `Project Settings > Player > Scripting Define Symbols` 中
-> 添加 `DISABLESTEAMWORKS` 即可编译出不含 Steam 的版本，传输层会自动降级到 UTP。
+> 添加 `DISABLESTEAMWORKS` 即可编译出不含 Steam 的版本，传输层会自动降级到 Tugboat。
 
 ---
 

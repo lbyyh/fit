@@ -14,6 +14,22 @@ namespace Fit.Player
     /// 【为什么后坐力要分「立即上跳」和「缓慢回复」】
     /// 只有缓慢回复的话，连射时准星会一路飘走，玩家压不住枪；
     /// 只有立即上跳的话手感很"顿"。两者叠加是主流 FPS 的做法。
+    ///
+    /// 【重要：本组件必须单独挂一层，不能直接挂在相机上】
+    /// 视角的 pitch 由 FPSController.ApplyLook 写到 Camera 自身的 localRotation，
+    /// 而本组件在 LateUpdate 里写的是「自己所挂物体」的 localRotation（后坐力）。
+    /// 如果两者挂同一个物体，LateUpdate 会整个覆盖掉鼠标的上下视角 ——
+    /// 表现为抬头低头完全失效，只剩后坐力在动。
+    ///
+    /// 正确的三层结构（yaw / pitch / 后坐力各占一层，互不覆盖）：
+    /// <code>
+    ///   Player              ← FPSController：transform.rotation = yaw
+    ///     └ CameraHolder    ← PlayerCamera：localRotation = 后坐力，localPosition = 震屏
+    ///         └ Main Camera ← FPSController：localRotation = pitch
+    ///             └ Muzzle ← 枪口，跟着视线走
+    /// </code>
+    /// 因为是三层，Awake 的 GetComponent 兜底拿不到相机，
+    /// 必须手动把 Main Camera 拖到 _camera 字段上。
     /// </summary>
     public sealed class PlayerCamera : MonoBehaviour
     {

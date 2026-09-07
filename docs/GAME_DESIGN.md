@@ -199,7 +199,7 @@ Assets/Scripts/
 
 | 主题 | 文档 | 状态 |
 |---|---|---|
-| 主地图 · 农场（Farm Hub） | [`docs/SCENE_FARM.md`](SCENE_FARM.md) | 💡 设计草案，待拍板（见该文 §7 H1-H4） |
+| 主地图 · 农场（Farm Hub） | [`docs/SCENE_FARM.md`](SCENE_FARM.md) | ✅ H1-H4 已拍板 · 场地与 3 种蔬菜已程序化生成，待 Unity 验证 |
 
 > 农场是**局外枢纽**（队伍集合 / 皮肤展示 / 蔬菜小怪热身），**不是闯关主题**。
 > 闯关主题仍是丛林 / 海岛 / 火山三个。
@@ -541,7 +541,9 @@ Assets/Scripts/
   [ ] 房间图生成器 + 特殊房（宝箱/商店/抽奖/精英/Boss）
   [ ] 更多武器（验证行为组合的拓展性）
   [ ] HUD / 小地图
-  [ ] 主地图 · 农场（docs/SCENE_FARM.md）：集合 + 皮肤展示 + 蔬菜小怪热身
+  [x] 主地图 · 农场：H1-H4 拍板，场地 + 3 种蔬菜模型已生成（docs/SCENE_FARM.md）
+  [ ] 主地图在 Unity 跑通：模型比例 / 蔬菜手感 / 前摇可见性
+  [ ] 主地图 · 农场（docs/SCENE_FARM.md）：蔬菜刷新 + 皮肤展示
 
 阶段 3：联机验证
   [ ] 2-5 人稳定联机（FishNet Prediction 接入）

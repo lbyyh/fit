@@ -67,34 +67,15 @@ namespace Fit.Editor
                       "\n操作：WASD 移动 / 鼠标视角 / 左键开火 / Shift 冲刺 / Ctrl 翻滚(无敌帧) / R 换弹 / E 救援队友");
         }
 
-        // -------- 目录 --------
+        // -------- 目录 / 材质 --------
+        //
+        // 实现统一放在 FitEditorUtils，与农场主地图生成器共用。
+        // 尤其材质那块：URP 材质默认不开 _EMISSION，前摇充能光效会完全看不见，
+        // 已在公共工具里统一修掉（详见 FitEditorUtils.SaveMaterial 注释）。
 
-        private static void EnsureDir(string dir)
-        {
-            if (AssetDatabase.IsValidFolder(dir)) return;
-            var parts = dir.Split('/');
-            string cur = parts[0];
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string parent = cur;
-                cur = cur + "/" + parts[i];
-                if (!AssetDatabase.IsValidFolder(cur))
-                    AssetDatabase.CreateFolder(parent, parts[i]);
-            }
-        }
+        private static void EnsureDir(string dir) => FitEditorUtils.EnsureDir(dir);
 
-        // -------- 材质 --------
-
-        private static Material SaveMaterial(string name, Color c)
-        {
-            // 优先 URP Lit（项目是 URP），回退 Standard；两种都尝试写主色属性
-            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            var mat = new Material(shader);
-            mat.SetColor("_BaseColor", c);
-            mat.SetColor("_Color", c);
-            AssetDatabase.CreateAsset(mat, $"{MatDir}/{name}.mat");
-            return mat;
-        }
+        private static Material SaveMaterial(string name, Color c) => FitEditorUtils.SaveMaterial(name, c);
 
         // -------- ScriptableObject --------
 
@@ -317,11 +298,7 @@ namespace Fit.Editor
         // -------- 工具 --------
 
         private static void SetRef(SerializedObject so, string prop, Object val)
-        {
-            var p = so.FindProperty(prop);
-            if (p != null) p.objectReferenceValue = val;
-            else Debug.LogWarning($"[Fit] 生成器：找不到字段 {prop}，请核对运行时脚本字段名");
-        }
+            => FitEditorUtils.SetRef(so, prop, val);
     }
 }
 #endif

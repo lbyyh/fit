@@ -200,6 +200,7 @@ Assets/Scripts/
 | 主题 | 文档 | 状态 |
 |---|---|---|
 | 主地图 · 农场（Farm Hub） | [`docs/SCENE_FARM.md`](SCENE_FARM.md) | ✅ H1-H4 已拍板 · 场地与 3 种蔬菜已程序化生成，待 Unity 验证 |
+| 工具栏与农耕 | [`docs/TOOLS_FARMING.md`](TOOLS_FARMING.md) | ✅ 已实现：底部 3 格 · 锄头 · 种植，待 Unity 验证 |
 
 > 农场是**局外枢纽**（队伍集合 / 皮肤展示 / 蔬菜小怪热身），**不是闯关主题**。
 > 闯关主题仍是丛林 / 海岛 / 火山三个。

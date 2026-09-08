@@ -1,4 +1,5 @@
 using Fit.Combat.Weapon;
+using Fit.Gameplay.Tools;
 using UnityEngine;
 
 namespace Fit.Player
@@ -27,6 +28,9 @@ namespace Fit.Player
         [SerializeField] private FPSController _controller;
         [SerializeField] private WeaponBase _weapon;
         [SerializeField] private DownedState _downed;
+        [Tooltip("底部工具栏。有它时左键交给工具栏分发（当前格可能是枪，也可能是锄头）。\n" +
+                 "留空则退回直接开火 —— 灰盒测试场景没有工具栏，走的就是这条路。")]
+        [SerializeField] private Hotbar _hotbar;
 
         [Header("输入")]
         [SerializeField] private KeyCode _jumpKey = KeyCode.Space;
@@ -53,6 +57,7 @@ namespace Fit.Player
             if (_controller == null) _controller = GetComponent<FPSController>();
             if (_weapon == null) _weapon = GetComponentInChildren<WeaponBase>();
             if (_downed == null) _downed = GetComponent<DownedState>();
+            if (_hotbar == null) _hotbar = GetComponent<Hotbar>();
 
             SetCursorLocked(_lockCursor);
         }
@@ -96,6 +101,21 @@ namespace Fit.Player
 
         private void TickWeapon()
         {
+            // 【左键归谁管】
+            // 装了工具栏的场景（主地图），左键交给当前格：
+            // 拿着锄头时如果还调 TryFire，就会出现"锄一下地还顺带开一枪"。
+            // 没装工具栏的场景（灰盒）保持原来的直接开火，不用为它额外配置。
+            if (_hotbar != null)
+            {
+                if (_weapon != null && Input.GetKeyDown(_reloadKey))
+                    _weapon.BeginReload();
+
+                _hotbar.UseCurrent(
+                    held: Input.GetMouseButton(0),
+                    pressed: Input.GetMouseButtonDown(0));
+                return;
+            }
+
             if (_weapon == null) return;
 
             if (Input.GetKeyDown(_reloadKey))

@@ -1,10 +1,16 @@
 using System.Collections.Generic;
+using Fit.Gameplay.Tools;
 using UnityEngine;
 
 namespace Fit.Combat.Weapon
 {
     /// <summary>
     /// 武器运行时逻辑。挂在玩家（或敌人）身上，持有一把 WeaponData。
+    ///
+    /// 【为什么实现 IHoldable】
+    /// 底部工具栏要能同时装枪和农具，所以武器也得是"可手持物"。
+    /// 这套接口只描述"选中 / 取消选中 / 左键使用"，
+    /// 武器内部该怎么打还是怎么打，不受影响（详见 IHoldable 注释）。
     ///
     /// 【为什么 Hitscan 和 Projectile 写在同一个类里】
     /// 它们是 WeaponData.Mode 的两个分支，共用弹匣、射速、后坐力、行为钩子。
@@ -20,7 +26,7 @@ namespace Fit.Combat.Weapon
     /// 弹幕场景下每秒可能生成上百个投射物，Instantiate/Destroy 会造成
     /// GC 尖峰导致掉帧 —— 在需要精确操作的弹幕游戏里，掉帧 = 死亡。
     /// </summary>
-    public sealed class WeaponBase : MonoBehaviour
+    public sealed class WeaponBase : MonoBehaviour, IHoldable
     {
         [Header("引用")]
         [SerializeField] private Transform _muzzle;
@@ -53,10 +59,54 @@ namespace Fit.Combat.Weapon
         public event System.Action<int, int> OnAmmoChanged;
         public event System.Action<WeaponData> OnWeaponChanged;
 
+        // ---------------------------------------------------------------- IHoldable
+        //
+        // 武器作为工具栏里的一格。接口只负责"选中/收起/左键"，
+        // 真正的开火逻辑仍然走 TryFire，不受这层抽象影响。
+
+        public string DisplayName => Data != null ? Data.DisplayName : string.Empty;
+        public Sprite Icon => Data != null ? Data.Icon : null;
+
+        public void OnSelect()
+        {
+            RebuildViewModel();
+            if (_viewModel != null) _viewModel.SetActive(true);
+        }
+
+        public void OnDeselect()
+        {
+            if (_viewModel != null) _viewModel.SetActive(false);
+        }
+
+        /// <summary>左键 = 开火。由 Hotbar.UseCurrent() 转发进来。</summary>
+        public void Use(bool held, bool pressed) => TryFire(held, pressed);
+
+        public void UseSecondary(bool held, bool pressed)
+        {
+            // 预留：右键瞄准（缩 FOV）。阶段 1 未实现。
+        }
+
+        /// <summary>
+        /// 重建第一人称手持模型。
+        /// 挂在相机（_muzzle 的父级）下而不是身体上 —— 枪要跟着视角走，
+        /// 而不是等身体转过去才跟上，否则转身时枪会"拖一下"。
+        /// </summary>
+        private void RebuildViewModel()
+        {
+            if (_viewModel != null) Destroy(_viewModel);
+            if (Data == null || Data.ViewModelPrefab == null) return;
+
+            var anchor = _muzzle != null && _muzzle.parent != null ? _muzzle.parent : transform;
+            _viewModel = Instantiate(Data.ViewModelPrefab, anchor);
+            _viewModel.transform.localPosition = Vector3.zero;
+            _viewModel.transform.localRotation = Quaternion.identity;
+        }
+
         private float _nextShotTime;
         private float _reloadEndTime;
         private int _burstRemaining;
         private readonly Queue<Projectile> _pool = new();
+        private GameObject _viewModel;
 
         public void Equip(WeaponData data)
         {
@@ -70,6 +120,8 @@ namespace Fit.Combat.Weapon
             AmmoInMagazine = data.MagazineSize;
             IsReloading = false;
             _burstRemaining = 0;
+
+            RebuildViewModel();
 
             OnWeaponChanged?.Invoke(data);
             OnAmmoChanged?.Invoke(AmmoInMagazine, Data.MagazineSize);
@@ -321,6 +373,10 @@ namespace Fit.Combat.Weapon
             _pool.Clear();
         }
 
-        private void OnDestroy() => ClearPool();
+        private void OnDestroy()
+        {
+            ClearPool();
+            if (_viewModel != null) Destroy(_viewModel);
+        }
     }
 }

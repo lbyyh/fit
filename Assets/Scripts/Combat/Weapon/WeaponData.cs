@@ -79,6 +79,8 @@ namespace Fit.Combat.Weapon
         public GameObject MuzzleFlashPrefab;
         [Tooltip("手持模型（第一人称手臂+枪）。Q2 决定：皮肤价值主要由它承载。")]
         public GameObject ViewModelPrefab;
+        [Tooltip("底部工具栏图标。与 ToolData.Icon 对齐，HUD 一视同仁。")]
+        public Sprite Icon;
 
         public float SecondsBetweenShots => FireRate > 0f ? 1f / FireRate : float.MaxValue;
 

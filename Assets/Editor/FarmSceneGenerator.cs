@@ -7,7 +7,10 @@ using UnityEngine.AI;
 using Fit.Combat;
 using Fit.Combat.Weapon;
 using Fit.Enemies;
+using Fit.Gameplay.Farming;
+using Fit.Gameplay.Tools;
 using Fit.Player;
+using Fit.UI;
 using Fit.World;
 
 namespace Fit.Editor
@@ -40,8 +43,10 @@ namespace Fit.Editor
     {
         private const string ScenePath = "Assets/Scenes/FarmHub.unity";
         private const string PrefabDir = "Assets/Prefabs/Veggies";
+        private const string CropDir = "Assets/Prefabs/Crops";
         private const string PatternDir = "Assets/ScriptableObjects/BulletPatterns";
         private const string WeaponDir = "Assets/ScriptableObjects/Weapons";
+        private const string ToolDir = "Assets/ScriptableObjects/Tools";
 
         // Unity 内置基本体缩放基准：Cube/Sphere 直径 1；Capsule/Cylinder/Cone 直径 1、高 2；Plane 10×10
 
@@ -439,7 +444,7 @@ namespace Fit.Editor
             BuildHayPiles();
             BuildTrees();
 
-            var player = BuildPlayer();
+            var player = BuildPlayer(carrot);
             player.transform.position = new Vector3(0f, 0f, -6f);
             player.transform.rotation = Quaternion.identity;   // 面向 +Z，正对菜园
 
@@ -589,6 +594,15 @@ namespace Fit.Editor
                         FitEditorUtils.Part(plot, PrimitiveType.Cube, "Ridge", soilDark,
                             0f, 0.17f, -1.7f + i * 1.13f, 11f, 0.10f, 0.55f);
                     }
+
+                    // 可耕种：挂上 Farmland，玩家就能用锄头在这块地上作业。
+                    // 碰撞体由 Farmland 自己补（Part() 会删掉零件的 Collider）。
+                    var land = plot.gameObject.AddComponent<Farmland>();
+                    var lso = new SerializedObject(land);
+                    FitEditorUtils.SetInt(lso, "_width", 11);
+                    FitEditorUtils.SetInt(lso, "_depth", 5);
+                    FitEditorUtils.SetFloat(lso, "_cellSize", 1f);
+                    lso.ApplyModifiedProperties();
                 }
             }
         }
@@ -798,7 +812,11 @@ namespace Fit.Editor
 
         // ------------------------------------------------------------------ 玩家
 
-        private static GameObject BuildPlayer()
+        /// <summary>
+        /// 搭玩家，并装好底部 3 格工具栏。
+        /// </summary>
+        /// <param name="carrotPrefab">胡萝卜兵 prefab —— 种子成熟后长出来的就是它。</param>
+        private static GameObject BuildPlayer(GameObject carrotPrefab)
         {
             var weapon = LoadOrCreateWeapon();
 
@@ -846,8 +864,151 @@ namespace Fit.Editor
             FitEditorUtils.SetRef(pso, "_camera", camera);
             pso.ApplyModifiedProperties();
 
+            BuildHotbar(player, weaponBase, camera, carrotPrefab);
+
             player.tag = "Player";
             return player;
+        }
+
+        // ---------------------------------------------------------------- 工具栏与农具
+
+        /// <summary>
+        /// 底部 3 格：武器 / 锄头 / 种子。
+        ///
+        /// 【为什么是这三样】
+        /// 主地图上玩家同时要做的事就三件：打菜、锄地、播种。
+        /// 3 格刚好，再多会挤占第一人称本就不宽的视野（§5.1 冲突一），
+        /// 而且主地图的农具体系不该长成一个完整的经营游戏 —— 那是另一个玩法循环。
+        ///
+        /// 【为什么种子种出来的是胡萝卜兵】
+        /// 见 CropDef 的注释：主地图不产出任何资源（H2 + SCENE_FARM §4），
+        /// 否则玩家会赖在这里种田而不去闯关。种下去长出一只小怪，
+        /// 玩家自己种、自己打，是个纯整活的闭环。
+        /// </summary>
+        private static void BuildHotbar(GameObject player, WeaponBase weaponBase,
+            Camera camera, GameObject carrotPrefab)
+        {
+            var hoeData = CreateHoeTool();
+            var seedData = CreateCarrotSeedTool(carrotPrefab);
+
+            var toolsRoot = FitEditorUtils.Node(player.transform, "Tools", Vector3.zero);
+            var hoe = BuildTool(toolsRoot, "Hoe", hoeData, camera);
+            var seeds = BuildTool(toolsRoot, "Seeds", seedData, camera);
+
+            var hotbar = player.AddComponent<Hotbar>();
+            var hso = new SerializedObject(hotbar);
+            SetHotbarSlot(hso, 0, weaponBase);
+            SetHotbarSlot(hso, 1, hoe);
+            SetHotbarSlot(hso, 2, seeds);
+            hso.ApplyModifiedProperties();
+
+            // HUD 自己建 Canvas，挂个空物体就行
+            var hudGo = new GameObject("HotbarHud");
+            var hud = hudGo.AddComponent<HotbarHud>();
+            var uso = new SerializedObject(hud);
+            FitEditorUtils.SetRef(uso, "_hotbar", hotbar);
+            uso.ApplyModifiedProperties();
+        }
+
+        private static ToolBase BuildTool(Transform root, string name, ToolData data, Camera camera)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root, false);
+
+            var tool = go.AddComponent<ToolBase>();
+            var so = new SerializedObject(tool);
+            FitEditorUtils.SetRef(so, "_tool", data);
+            FitEditorUtils.SetRef(so, "_aimCamera", camera);
+            so.ApplyModifiedProperties();
+            return tool;
+        }
+
+        /// <summary>设置 Hotbar 的初始槽位（数组需要先撑到对应长度）。</summary>
+        private static void SetHotbarSlot(SerializedObject hotbar, int index, Object value)
+        {
+            var arr = hotbar.FindProperty("_initialSlots");
+            if (arr == null) return;
+
+            if (arr.arraySize <= index) arr.arraySize = index + 1;
+            arr.GetArrayElementAtIndex(index).objectReferenceValue = value;
+        }
+
+        private static ToolData CreateHoeTool()
+        {
+            var t = ScriptableObject.CreateInstance<ToolData>();
+            t.Id = "hoe";
+            t.DisplayName = "锄头";
+            t.Kind = ToolKind.Hoe;
+            t.UseCooldown = 0.35f;
+            t.Range = 4f;
+
+            FitEditorUtils.EnsureDir(ToolDir);
+            AssetDatabase.CreateAsset(t, $"{ToolDir}/Tool_Hoe.asset");
+            return t;
+        }
+
+        private static ToolData CreateCarrotSeedTool(GameObject carrotPrefab)
+        {
+            var t = ScriptableObject.CreateInstance<ToolData>();
+            t.Id = "seed_carrot";
+            t.DisplayName = "胡萝卜种子";
+            t.Kind = ToolKind.Seed;
+            t.UseCooldown = 0.30f;
+            t.Range = 4f;
+            t.Crop = new CropDef
+            {
+                StagePrefabs = BuildCropStages("Carrot", new Color(0.95f, 0.45f, 0.10f)),
+                StageSeconds = new[] { 10f, 10f, 10f },
+                MatureEnemyPrefab = carrotPrefab,
+                WateredGrowthMultiplier = 2f,
+                WateredDuration = 30f,
+            };
+
+            FitEditorUtils.EnsureDir(ToolDir);
+            AssetDatabase.CreateAsset(t, $"{ToolDir}/Tool_SeedCarrot.asset");
+            return t;
+        }
+
+        /// <summary>
+        /// 作物三个阶段模型：幼苗 → 长叶 → 结果。
+        /// 成熟阶段只画"带果的植株"，不画脸 —— 脸是长出来的小怪的事。
+        /// </summary>
+        private static GameObject[] BuildCropStages(string id, Color fruitColor)
+        {
+            var leaf = Mat("Crop_Leaf", new Color(0.34f, 0.62f, 0.24f));
+            var stem = Mat("Crop_Stem", new Color(0.28f, 0.52f, 0.20f));
+            var fruitMat = Mat($"Crop_Fruit_{id}", fruitColor);
+
+            FitEditorUtils.EnsureDir(CropDir);
+            var stages = new GameObject[3];
+
+            for (int s = 0; s < 3; s++)
+            {
+                float h = 0.24f + s * 0.24f;   // 0.24 / 0.48 / 0.72
+                var root = new GameObject($"Crop_{id}_Stage{s}");
+
+                FitEditorUtils.Part(root.transform, PrimitiveType.Cylinder, "Stem", stem,
+                    0f, h * 0.5f, 0f, 0.05f, h * 0.5f, 0.05f);
+
+                int leaves = 2 + s;
+                for (int l = 0; l < leaves; l++)
+                {
+                    var pivot = FitEditorUtils.Node(root.transform, $"Leaf_{l}",
+                        new Vector3(0f, h * (0.42f + 0.14f * l), 0f));
+                    pivot.localEulerAngles = new Vector3(-38f, l * (360f / leaves), 0f);
+                    FitEditorUtils.Part(pivot, PrimitiveType.Sphere, "Blade", leaf,
+                        0f, 0f, 0.13f, 0.09f, 0.045f, 0.24f);
+                }
+
+                if (s == 2)
+                    FitEditorUtils.Part(root.transform, PrimitiveType.Sphere, "Fruit", fruitMat,
+                        0f, h * 0.62f, 0.10f, 0.18f, 0.18f, 0.18f);
+
+                stages[s] = PrefabUtility.SaveAsPrefabAsset(root, $"{CropDir}/Crop_{id}_Stage{s}.prefab");
+                Object.DestroyImmediate(root);
+            }
+
+            return stages;
         }
 
         private static WeaponData LoadOrCreateWeapon()

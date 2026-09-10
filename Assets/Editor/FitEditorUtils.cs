@@ -69,6 +69,88 @@ namespace Fit.Editor
             return mat;
         }
 
+        /// <summary>
+        /// 把导入材质（Built-in Standard）转成 URP Lit。
+        ///
+        /// 【为什么需要这一步】
+        /// OBJ 和不少 FBX 导入时，Unity 按 Built-in 管线生成 Standard 材质。
+        /// 本项目是 URP，Standard 在 URP 下要么显示成洋红（shader 缺失），
+        /// 要么被自动替换但丢贴图。所以外部模型导入后必须显式转一次。
+        ///
+        /// 【两个管线的属性名不一样】
+        /// Standard 用 _MainTex / _Color，URP Lit 用 _BaseMap / _BaseColor。
+        /// 必须逐个搬运，直接换 shader 会丢贴图（表现为模型全白或全灰）。
+        ///
+        /// 【顺便开 _EMISSION】
+        /// 与 SaveMaterial 同理：URP Lit 默认不开 emission keyword。
+        /// 外部模型将来若要接 Telegraph 之类的自发光效果，这里预先打开省事。
+        /// </summary>
+        internal static Material ToUrp(Material src, string matDir, string fallbackName)
+        {
+            EnsureDir(matDir);
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) return src;
+
+            var mat = new Material(shader);
+            mat.name = !string.IsNullOrEmpty(src?.name) ? src.name : fallbackName;
+
+            if (src != null)
+            {
+                // 主贴图
+                if (src.HasProperty("_MainTex") && src.GetTexture("_MainTex") is Texture mainTex)
+                    mat.SetTexture("_BaseMap", mainTex);
+                if (src.HasProperty("_Color"))
+                    mat.SetColor("_BaseColor", src.GetColor("_Color"));
+
+                // 法线
+                if (src.HasProperty("_BumpMap") && src.GetTexture("_BumpMap") is Texture bump)
+                {
+                    mat.SetTexture("_BumpMap", bump);
+                    mat.EnableKeyword("_NORMALMAP");
+                }
+
+                // 金属度/光滑度（Standard 用 Metallic/Glossiness，URP 用 Metallic/Smoothness）
+                if (src.HasProperty("_Metallic"))
+                    mat.SetFloat("_Metallic", src.GetFloat("_Metallic"));
+                if (src.HasProperty("_Glossiness"))
+                    mat.SetFloat("_Smoothness", src.GetFloat("_Glossiness"));
+
+                // 自发光
+                if (src.HasProperty("_EmissionMap") && src.GetTexture("_EmissionMap") is Texture em)
+                    mat.SetTexture("_EmissionMap", em);
+                if (src.HasProperty("_EmissionColor"))
+                    mat.SetColor("_EmissionColor", src.GetColor("_EmissionColor"));
+
+                // 渲染模式（透明/裁剪）
+                if (src.HasProperty("_Mode"))
+                {
+                    int mode = (int)src.GetFloat("_Mode");
+                    // 0=Opaque 1=Cutout 2=Fade 3=Transparent
+                    switch (mode)
+                    {
+                        case 1:
+                            mat.SetFloat("_Surface", 1f);
+                            mat.SetFloat("_AlphaClip", 1f);
+                            break;
+                        case 2:
+                        case 3:
+                            mat.SetFloat("_Surface", 1f);
+                            mat.SetFloat("_Blend", mode == 2 ? 0f : 1f);
+                            break;
+                    }
+                }
+            }
+
+            mat.SetColor("_EmissionColor", Color.black);
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+
+            var path = $"{matDir}/{mat.name}.mat";
+            AssetDatabase.CreateAsset(mat, AssetDatabase.GenerateUniqueAssetPath(path));
+            return mat;
+        }
+
         // -------- SerializedObject 赋值 --------
         //
         // 运行时的引用字段全是 [SerializeField] private，编辑器脚本拿不到。

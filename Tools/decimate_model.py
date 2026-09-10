@@ -29,6 +29,16 @@ glTFast 要从 Unity Registry 联网下载，而本项目的原则是不引入�
 依赖
 ----
     pip install pymeshlab
+
+国内装不下来就换源（国外源实测 20 分钟超时，清华源 1 分半）:
+    pip install pymeshlab -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+版本兼容:已实测 2025.7.post1 与 2023.12+ 均可。
+两个版本 API 有差异，但本脚本只用到跨版本稳定的部分
+（MeshSet.apply_filter / current_mesh），所以都能跑。
+注意:filter_list() / print_filter_parameter_list() 在旧版里是模块级函数
+（pymeshlab.filter_list()），新版才是 MeshSet 实例方法 —— 排查参数时别按
+同一写法调用。
 """
 
 import argparse
